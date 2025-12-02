@@ -1,0 +1,10 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import joblib
+
+# ... (Phần TẢI MÔ HÌNH VÀ CÔNG CỤ CHUẨN HÓA ĐÃ LƯU) ...
+# ... (Phần ĐỊNH NGHĨA CÁC ĐẶC TRƯNG ĐẦU VÀO) ...
+# ... (Phần THIẾT LẬP GIAO DIỆN WEB và CHỨC NĂNG DỰ ĐOÁN) ...
+
+# (Toàn bộ code này nằm trong file app.py)
