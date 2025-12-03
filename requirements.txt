@@ -1,4 +1,6 @@
 streamlit
 pandas
-scikit-learn
+numpy
+scipy
+scikit-learn==1.6.1  # CỐ ĐỊNH PHIÊN BẢN CHO KHỚP MÔ HÌNH
 joblib
