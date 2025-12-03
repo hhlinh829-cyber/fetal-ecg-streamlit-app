@@ -5,31 +5,39 @@ import joblib
 
 import streamlit as st
 import joblib
+import os # Thêm thư viện os để kiểm tra tệp
 
-# ... (Giữ nguyên các lệnh import khác nếu có)
-# import pandas as pd
-# import numpy as np 
-
-# BẮT ĐẦU PHẦN THAY THẾ
+# Thêm decorator @st.cache_resource
 @st.cache_resource
 def load_model_and_scaler():
     """Tải mô hình và scaler đã lưu."""
+    
+    # ĐƯỜNG DẪN ĐẾN CÁC TỆP TRÊN STREAMLIT CLOUD
+    model_path = 'fetal_health_model.pkl'
+    scaler_path = 'fetal_health_scaler.pkl'
+    
+    # BƯỚC 1: KIỂM TRA SỰ TỒN TẠI CỦA TỆP
+    if not os.path.exists(model_path):
+        st.error(f"Lỗi Tải File: Không tìm thấy '{model_path}'. Vui lòng kiểm tra tên file trên GitHub.")
+        return None, None
+    if not os.path.exists(scaler_path):
+        st.error(f"Lỗi Tải File: Không tìm thấy '{scaler_path}'. Vui lòng kiểm tra tên file trên GitHub.")
+        return None, None
+    
     try:
-        # Tải Mô hình
-        model = joblib.load('fetal_health_model.pkl')
-        
-        # Tải Scaler
-        scaler = joblib.load('fetal_health_scaler.pkl')
-        
+        # BƯỚC 2: TẢI TỆP
+        model = joblib.load(model_path)
+        scaler = joblib.load(scaler_path)
+        st.success("Tải mô hình thành công! Ứng dụng đã sẵn sàng.") # Thêm thông báo thành công
         return model, scaler
-    except FileNotFoundError:
-        # st.error sẽ hiển thị lỗi trên web nếu không tìm thấy file
-        st.error("Lỗi: Không tìm thấy file mô hình (.pkl). Vui lòng kiểm tra lại tên file trên GitHub.")
+    except Exception as e:
+        # Lỗi xảy ra khi đọc tệp (dù tệp tồn tại)
+        st.error(f"Lỗi: Không thể đọc file mô hình. Chi tiết lỗi: {e}")
         return None, None
 
-# Gọi hàm tải mô hình và scaler. Dữ liệu trả về sẽ thay thế biến 'model' và 'scaler' cũ của bạn.
+# Gọi hàm tải mô hình và scaler
 model, scaler = load_model_and_scaler()
 
-# KẾT THÚC PHẦN THAY THẾ
-# ... (Phần code thiết lập giao diện web của bạn sẽ nằm ở dưới đây)
-
+# Thêm dòng kiểm tra nếu mô hình tải không thành công thì dừng chương trình
+if model is None or scaler is None:
+    st.stop()
