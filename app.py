@@ -5,7 +5,8 @@ import joblib
 import os 
 
 # CẤU HÌNH TRANG WEB
-st.set_page_config(page_title="Chẩn đoán CTG AI", layout="wide")
+# Đổi tiêu đề thanh tab trình duyệt
+st.set_page_config(page_title="Chẩn đoán Bất thường Thai kỳ", layout="wide")
 
 # ==============================================================================
 # PHẦN 1: TẢI MÔ HÌNH VÀ SCALER
@@ -40,10 +41,11 @@ if model is None or scaler is None:
     st.stop()
     
 # ==============================================================================
-# PHẦN 2: GIAO DIỆN VÀ XỬ LÝ DỮ LIỆU (ĐÃ SỬA LỖI TÊN CỘT DÙNG CHO SCALING)
+# PHẦN 2: GIAO DIỆN VÀ XỬ LÝ DỮ LIỆU (ĐÃ SỬA TIÊU ĐỀ CHÍNH)
 # ==============================================================================
 
-st.title("🩺 Ứng Dụng Phân Tích Điện Tim Thai (CTG) - Chẩn đoán Sơ bộ AI")
+# DÒNG NÀY ĐÃ ĐƯỢC CẬP NHẬT THEO YÊU CẦU CỦA BẠN
+st.title("🩺 Chẩn đoán sơ bộ các bất thường thai kì bằng ứng dụng AI dựa trên chỉ số điện tâm đồ")
 st.markdown("---")
 st.subheader("Nhập 21 Chỉ Số Điện Tim Thai (CTG)")
 
@@ -121,7 +123,6 @@ if st.button('🔮 Chẩn Đoán Sơ Bộ', use_container_width=True):
     input_df = pd.DataFrame([input_data], index=[0])
     
     # 2. Đảm bảo thứ tự cột CHÍNH XÁC (Rất quan trọng cho scikit-learn/joblib)
-    # Lỗi ValueError xảy ra vì tên cột không khớp và/hoặc thứ tự bị sai. Dòng này sửa lỗi đó.
     input_df = input_df[MODEL_FEATURE_NAMES]
     
     # 3. Chuẩn hóa dữ liệu (Scaling)
