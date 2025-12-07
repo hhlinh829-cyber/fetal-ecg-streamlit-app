@@ -72,7 +72,7 @@ def apply_custom_css():
         }}
         
         /* Thiết lập màu cho input */
-        .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stDateInput>div>div>input {{
+        .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stDateInput>div>div>input, .stNumberInput>div>div>input {{
             border-radius: 8px;
             border: 1px solid {COLOR_BLUE};
             background-color: {COLOR_LIGHT_GRAY};
@@ -160,17 +160,19 @@ def navigate_to(page):
 def login_page():
     """Màn hình chào mừng và đăng nhập."""
     
-    st.markdown(f'<div class="main-content-box" style="width: 350px; margin: auto; padding: 40px; text-align: center;">', unsafe_allow_html=True)
+    # Thiết lập layout giữa trang
+    st.markdown(f'<div style="display: flex; justify-content: center; align-items: center; min-height: 100vh;">', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="main-content-box" style="width: 350px; padding: 40px; text-align: center;">', unsafe_allow_html=True)
     st.markdown(f"## Chào mừng bạn quay trở lại!", unsafe_allow_html=True)
     st.markdown("---")
     
     # Sử dụng form để tạo nhóm input và button
     with st.form("login_form", clear_on_submit=False):
         # Email/SĐT
-        # Giao diện không có icon theo yêu cầu
         email = st.text_input("Email hoặc số điện thoại", key="email_input", placeholder="Nhập email hoặc số điện thoại")
         
-        # Mật khẩu (Không có chi tiết mắt cạnh mật khẩu trong Streamlit cơ bản, dùng type="password")
+        # Mật khẩu
         password = st.text_input("Mật khẩu", type="password", key="password_input", placeholder="Nhập mật khẩu") 
 
         st.markdown(
@@ -198,12 +200,18 @@ def login_page():
     st.markdown("<hr style='border: 1px solid #ccc; margin-top: 20px;'>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; font-size: 14px;'>Hoặc tiếp tục với</p>", unsafe_allow_html=True)
     
-    # Giả lập các nút đăng nhập khác (không dùng icon theo yêu cầu)
+    # Giả lập các nút đăng nhập khác 
     col_x, col_y = st.columns([1, 1])
     with col_x:
-         st.button("Tạm thời bỏ qua", key="skip_login", use_container_width=True)
+         if st.button("Tạm thời bỏ qua", key="skip_login", use_container_width=True):
+             # Giả lập đăng nhập bỏ qua
+             st.session_state.logged_in = True
+             st.session_state.user_id = "guest@app.com"
+             navigate_to("home")
+             st.experimental_rerun()
+             
     with col_y:
-        # Nút tạo tài khoản mới (làm rõ lên)
+        # Nút tạo tài khoản mới 
         if st.button("Tạo Tài Khoản Mới", key="create_account_btn", use_container_width=True):
             st.info("Chức năng tạo tài khoản mới đang được phát triển.")
 
@@ -217,6 +225,7 @@ def login_page():
         """,
         unsafe_allow_html=True
     )
+    st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -267,7 +276,8 @@ def home_page():
                     'thuoc_su_dung': [m.strip() for m in meds_text.split(',')]
                 })
                 st.success("Đã lưu Hồ sơ Mẹ thành công!")
-                st.experimental_rerun()
+                # Không cần rerun nếu chỉ cập nhật state và muốn giao diện ở tab này giữ nguyên
+                # st.experimental_rerun() 
         st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -279,43 +289,48 @@ def home_page():
         with st.form("baby_profile_form"):
             col_c, col_d = st.columns(2)
             temp_data = st.session_state.profile_data
+            
+            # Khởi tạo giá trị ban đầu cho các biến
+            ngay_du_sinh_hien_tai = temp_data['ngay_du_sinh']
+            tuan_thai_hien_tai = temp_data['tuan_thai_hien_tai']
 
             with col_c:
                 lan_sinh_thu = st.number_input("Lần sinh thứ", min_value=1, max_value=10, value=temp_data['lan_sinh_thu'], step=1)
-                
-                # Tính tuần thai tự động
-                today = datetime.date.today()
-                ngay_du_sinh_hien_tai = temp_data['ngay_du_sinh']
                 
                 # Lấy ngày dự sinh từ input
                 ngay_du_sinh_moi = st.date_input("Ngày dự sinh (Dự kiến)", value=ngay_du_sinh_hien_tai)
 
                 # Tính toán lại tuần thai
+                today = datetime.date.today()
                 if ngay_du_sinh_moi:
                     # Giả định thai kỳ 40 tuần (280 ngày)
                     total_days = 40 * 7 
                     days_remaining = (ngay_du_sinh_moi - today).days
                     days_passed = total_days - days_remaining
+                    # Đảm bảo tuần thai không âm và không vượt quá 40
                     tuan_thai_hien_tai = max(0, min(40, days_passed // 7))
                     
+                    # Cập nhật state tạm thời để hiển thị ngay
                     st.session_state.profile_data['tuan_thai_hien_tai'] = tuan_thai_hien_tai
+                    
                     st.markdown(f"**Tuần thai hiện tại (Tự tính):** <span style='color: {COLOR_DARK_PINK}; font-size: 20px; font-weight: 700;'>Tuần {tuan_thai_hien_tai}</span>", unsafe_allow_html=True)
                 
             with col_d:
-                # Cân nặng ước tính theo tuần thai (Giả lập theo công thức đơn giản, chỉ mang tính minh họa)
-                # Ví dụ: tuần 20 là 300g, mỗi tuần tăng 100g.
-                weight_estimate = max(0, (tuan_thai_hien_tai - 20) * 100 + 300) 
+                # Cân nặng ước tính theo tuần thai (Giả lập)
+                weight_estimate_g = max(10, (tuan_thai_hien_tai - 12) * 250 + 50) # Bắt đầu tính từ tuần 12
                 
-                st.markdown(f"**Cân nặng ước tính:** <span style='color: {COLOR_DARK_BLUE}; font-size: 20px; font-weight: 700;'>{weight_estimate/1000:.2f} kg</span>", unsafe_allow_html=True)
+                st.markdown(f"**Cân nặng ước tính:** <span style='color: {COLOR_DARK_BLUE}; font-size: 20px; font-weight: 700;'>{weight_estimate_g/1000:.2f} kg</span>", unsafe_allow_html=True)
                 
                 # Mục này chỉ hiển thị, không cho chỉnh sửa trực tiếp
                 st.markdown("**Các mốc phát triển quan trọng:** (Tự động theo Tuần)")
                 if tuan_thai_hien_tai < 12:
-                    st.info("Giai đoạn hình thành cơ quan (Quý 1).")
+                    st.info("Quý 1: Giai đoạn hình thành cơ quan quan trọng.")
                 elif tuan_thai_hien_tai < 28:
-                    st.info("Giai đoạn phát triển chiều dài và cân nặng (Quý 2).")
+                    st.info("Quý 2: Giai đoạn phát triển cơ thể và giác quan.")
+                elif tuan_thai_hien_tai < 40:
+                    st.info("Quý 3: Giai đoạn hoàn thiện phổi và tăng tốc cân nặng.")
                 else:
-                    st.info("Giai đoạn hoàn thiện phổi và tăng tốc cân nặng (Quý 3).")
+                    st.success("Thai đủ tháng! Sẵn sàng chào đón bé yêu.")
 
 
             submitted_baby = st.form_submit_button("Lưu Hồ Sơ Bé", type="primary")
@@ -324,15 +339,16 @@ def home_page():
                 st.session_state.profile_data.update({
                     'lan_sinh_thu': lan_sinh_thu,
                     'ngay_du_sinh': ngay_du_sinh_moi,
+                    'tuan_thai_hien_tai': tuan_thai_hien_tai, # Lưu giá trị đã tính toán
                 })
                 st.success("Đã lưu Hồ sơ Bé thành công!")
-                st.experimental_rerun()
+                # Không cần rerun
         st.markdown('</div>', unsafe_allow_html=True)
         
     # 3. Chẩn đoán Điện Tim
     with tab3:
         st.markdown(f'<div class="main-content-box">', unsafe_allow_html=True)
-        st.subheader("B. Chẩn đoán sơ bộ bằng AI")
+        st.subheader("C. Chẩn đoán sơ bộ bằng AI")
         st.info("Đây là công cụ hỗ trợ. Kết quả cuối cùng phải dựa trên đánh giá của bác sĩ.")
         
         # --- Mục Tải Dữ liệu ---
@@ -346,27 +362,31 @@ def home_page():
         if 'show_input_form' not in st.session_state:
             st.session_state.show_input_form = False
             
-        if st.button("Nhấp vào đây để Nhập 21 Chỉ Số", key="toggle_input"):
+        # Nút hiện/ẩn form
+        if st.button("Nhấp vào đây để Nhập 21 Chỉ Số", key="toggle_input", use_container_width=True):
             st.session_state.show_input_form = not st.session_state.show_input_form
 
         input_data = {}
 
         if st.session_state.show_input_form:
+            st.markdown("---")
+            st.markdown("##### Nhập các chỉ số theo kết quả máy đo:")
             with st.form("manual_input_form"):
                 cols = st.columns(3)
+                # Thiết lập các giá trị mặc định cho 21 chỉ số
+                default_values = [120.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 73.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 120.0]
+                
                 for i, feature in enumerate(MODEL_FEATURE_NAMES):
                     with cols[i % 3]:
-                        # Giả lập nhập liệu với giá trị mặc định để dễ test
-                        default_val = 120.0 if "Baseline" in feature else (0.5 if "%" in feature else 0.0)
-                        input_data[feature] = st.number_input(feature, value=default_val, step=0.1, key=f"input_{i}")
+                        # Sử dụng các giá trị mặc định đã định sẵn
+                        input_data[feature] = st.number_input(feature, value=default_values[i], step=0.01, key=f"input_{i}")
 
-                ghi_chu = st.text_area("Ghi chú của mẹ về lần đo/kiểm tra này", value="")
+                ghi_chu = st.text_area("Ghi chú của mẹ về lần đo/kiểm tra này", value="", height=50)
                 
-                submitted_diagnosis = st.form_submit_button("Gửi Dữ Liệu & Chẩn Đoán", type="primary")
+                submitted_diagnosis = st.form_submit_button("Gửi Dữ Liệu & Chẩn Đoán", type="primary", use_container_width=True)
                 
                 if submitted_diagnosis:
                     # Giả lập kết quả AI (random 50-100 để có cả 3 trường hợp)
-                    # Giả sử: giá trị càng cao, nguy cơ càng lớn
                     mock_prediction = np.random.randint(50, 101) 
                     
                     # 1. Lấy kết quả chẩn đoán và lời khuyên
@@ -378,21 +398,19 @@ def home_page():
                     new_diagnosis = {
                         'Ngày - Giờ': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         'Kết quả sơ bộ': result,
-                        'Mức độ': mock_prediction,
+                        'Mức độ': mock_prediction, # Lưu mức độ dưới dạng số để sort và phân loại
                         'Chỉ số cụ thể (Ẩn)': diagnosis_details,
                         'Ghi chú': ghi_chu if ghi_chu else 'Không có'
                     }
                     
                     # Lưu vào Lịch sử (Session State)
                     new_df = pd.DataFrame([new_diagnosis])
-                    # Kiểm tra và chuyển cột "Chỉ số cụ thể (Ẩn)" sang kiểu object để tránh lỗi
-                    new_df['Chỉ số cụ thể (Ẩn)'] = new_df['Chỉ số cụ thể (Ẩn)'].astype(object)
                     st.session_state.diagnosis_history = pd.concat([st.session_state.diagnosis_history, new_df], ignore_index=True)
                     
                     st.success("Đã gửi dữ liệu và nhận kết quả chẩn đoán!")
                     st.session_state.last_diagnosis_result = {'result': result, 'color': color, 'advice': advice, 'time': new_diagnosis['Ngày - Giờ']}
                     
-                    # Tắt form nhập liệu
+                    # Tắt form nhập liệu và cập nhật giao diện
                     st.session_state.show_input_form = False
                     st.experimental_rerun()
         
@@ -410,6 +428,7 @@ def home_page():
             
             st.markdown(f"<p style='color: {COLOR_DARK_BLUE};'>Các chỉ số cho thấy:</p>", unsafe_allow_html=True)
             
+            # Hiển thị lời nhận xét
             st.markdown(f"<p style='color: {COLOR_DARK_BLUE}; font-weight: 500;'>{res['advice']}</p>", unsafe_allow_html=True)
 
             st.markdown('</div>', unsafe_allow_html=True)
@@ -458,7 +477,7 @@ def handbook_page():
         st.markdown("##### 💊 Danh sách thuốc đã nhập:")
         
         # Chỉ hiển thị các mục không rỗng
-        display_meds = [m for m in current_meds if m]
+        display_meds = [m for m in current_meds if m.strip()]
         
         if display_meds:
             for med in display_meds:
@@ -472,11 +491,11 @@ def handbook_page():
         with st.form("add_med_form", clear_on_submit=True):
             new_med = st.text_input("Tên thuốc/TPCN mới", key="new_med_input")
             if st.form_submit_button("+ Thêm", type="primary", key="add_med_btn"):
-                if new_med and new_med.strip() not in current_meds:
+                if new_med and new_med.strip() not in [m.strip() for m in current_meds]:
                     st.session_state.profile_data['thuoc_su_dung'].append(new_med.strip())
                     st.success(f"Đã thêm '{new_med.strip()}' vào nhật ký.")
                     st.experimental_rerun()
-                elif new_med.strip() in current_meds:
+                elif new_med.strip() in [m.strip() for m in current_meds]:
                      st.warning("Thuốc này đã có trong danh sách.")
                 else:
                     st.error("Vui lòng nhập tên thuốc.")
@@ -500,26 +519,32 @@ def handbook_page():
         with col_e:
             st.markdown("**🍲 Dinh Dưỡng Đề Xuất:**", unsafe_allow_html=True)
             st.markdown(f"""
-                - **Sắt và Axit Folic:** Rất quan trọng trong 3 tháng đầu.
-                - **Canxi:** Sữa, sữa chua, phô mai.
-                - **Protein và Chất Xơ:** Thịt nạc, cá, trứng và các loại hạt.
-            """)
+                <ul style="color: {COLOR_DARK_BLUE}; padding-left: 20px;">
+                    <li>**Sắt và Axit Folic:** Rất quan trọng trong 3 tháng đầu.</li>
+                    <li>**Canxi:** Sữa, sữa chua, phô mai.</li>
+                    <li>**Protein và Chất Xơ:** Thịt nạc, cá, trứng và các loại hạt.</li>
+                </ul>
+            """, unsafe_allow_html=True)
             
         with col_f:
             st.markdown("**🤸 Bài Tập Sức Khỏe:**", unsafe_allow_html=True)
             st.markdown(f"""
-                - **Đi bộ:** 30 phút mỗi ngày.
-                - **Bơi lội:** Giảm áp lực lên khớp.
-                - **Yoga/Pilates:** Các bài tập nhẹ nhàng, chuyên biệt cho bà bầu.
-            """)
+                <ul style="color: {COLOR_DARK_BLUE}; padding-left: 20px;">
+                    <li>**Đi bộ:** 30 phút mỗi ngày.</li>
+                    <li>**Bơi lội:** Giảm áp lực lên khớp.</li>
+                    <li>**Yoga/Pilates:** Các bài tập nhẹ nhàng, chuyên biệt cho bà bầu.</li>
+                </ul>
+            """, unsafe_allow_html=True)
         
         st.markdown(f"#### 3. Massage Cơ Thể", unsafe_allow_html=True)
         st.caption("Massage giúp giảm sưng phù và thư giãn tinh thần.")
         st.markdown(f"""
-            - **Chân và Bàn chân:** Giúp lưu thông máu.
-            - **Vùng lưng dưới:** Giảm đau lưng.
-            - **Vai và Cổ:** Thư giãn cơ.
-        """)
+            <ul style="color: {COLOR_DARK_BLUE}; padding-left: 20px;">
+                <li>**Chân và Bàn chân:** Giúp lưu thông máu.</li>
+                <li>**Vùng lưng dưới:** Giảm đau lưng.</li>
+                <li>**Vai và Cổ:** Thư giãn cơ.</li>
+            </ul>
+        """, unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -551,10 +576,10 @@ def settings_page():
             
             with col_g:
                 if st.form_submit_button("Lưu Thay Đổi", type="primary"):
-                    if mk_moi == xac_nhan_mk_moi and len(mk_moi) > 5:
+                    if mk_moi and mk_moi == xac_nhan_mk_moi and len(mk_moi) >= 6:
                         st.success("Đã thay đổi mật khẩu thành công (Giả lập).")
                     else:
-                        st.error("Mật khẩu mới không khớp hoặc quá ngắn.")
+                        st.error("Mật khẩu mới không khớp hoặc quá ngắn (tối thiểu 6 ký tự).")
             
             with col_h:
                 if st.button("Đăng Xuất", key="logout_btn"):
@@ -597,6 +622,7 @@ def main():
 
     # 2. Xử lý logic đăng nhập
     if not st.session_state.logged_in:
+        # Nếu chưa đăng nhập, hiển thị trang đăng nhập
         login_page()
         return
 
@@ -611,6 +637,10 @@ def main():
         "settings": "⚙️ Cài Đặt"
     }
     
+    # Đảm bảo trang hiện tại nằm trong các tùy chọn
+    if st.session_state.current_page not in nav_options:
+        st.session_state.current_page = "home"
+        
     # Sử dụng radio/select box để tạo hiệu ứng chọn trang tốt hơn trong Streamlit
     selected_page = st.sidebar.radio(
         "Chọn Trang", 
