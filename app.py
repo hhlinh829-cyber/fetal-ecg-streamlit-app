@@ -1,671 +1,237 @@
 import streamlit as st
-import datetime
-import pandas as pd
-import numpy as np
-import time
 
-# --- Cấu hình giao diện và Phong cách (Aesthetics) ---
+# --- Configuration based on user requirements ---
+# Tone: Xanh dương (Blue), Hồng (Pink), Be (Beige) pastel.
+# Background: White/Beige. Text: Darker Blue/Pink for visibility.
+# No icons. Elegant, easy-to-use interface.
 
-# Tông màu chủ đạo (Pastel Blue, Pink, Beige)
-COLOR_BEIGE = "#f8f7f3"
-COLOR_BLUE = "#a8dadc"       # Xanh pastel
-COLOR_DARK_BLUE = "#1d3557"  # Xanh đậm cho chữ
-COLOR_PINK = "#fcc8c8"       # Hồng pastel
-COLOR_DARK_PINK = "#e63946"  # Hồng đậm cho chữ
-COLOR_LIGHT_GRAY = "#eeeeee"
+# Pastel Color Palette
+COLOR_BLUE = '#A9D6E5' # Light Blue
+COLOR_PINK = '#FFB8C1' # Light Pink
+COLOR_BEIGE = '#F5F5DC' # Beige / Cream background base
+COLOR_DARK_BLUE = '#1B4965' # Darker Blue for text/accents
+COLOR_DARK_PINK = '#C06C84' # Darker Pink for text/accents
 
-# 21 chỉ số giả lập (Dùng cho phần chẩn đoán)
-MODEL_FEATURE_NAMES = [
-    "Baseline Value (bpm)", "Accel Time (msec)", "Movements", "Uterine Contractions",
-    "Light Decels", "Severe Decels", "Long Decels", "Var Short Term (%)", 
-    "Var Short Term Mean", "Var Long Term (%)", "Var Long Term Mean", "Histogram Width", 
-    "Mode", "Mean", "Median", "Variance", "Tendency", "Hist Peaks", "Hist Zeros",
-    "NSP (A, B, C)", "LBE (bpm)" 
-]
+# Custom CSS for the specified theme and layout
+custom_css = f"""
+<style>
+    /* Set page background to a soft beige/cream */
+    .stApp {{
+        background-color: {COLOR_BEIGE};
+    }}
 
-def apply_custom_css():
-    """Áp dụng CSS tùy chỉnh để thiết lập tông màu pastel và font chữ."""
-    # Lưu ý: Font chữ được sử dụng là font hệ thống hiện đại.
-    css = f"""
-    <style>
-        /* Thiết lập font và nền chung */
-        .stApp {{
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: {COLOR_BEIGE};
-        }}
-        
-        /* Tiêu đề chính */
-        h1 {{ 
-            color: {COLOR_DARK_BLUE};
-            font-weight: 700;
-        }}
-        
-        /* Màu chữ đậm theo yêu cầu */
-        h2, h3, h4, h5, h6, label, .st-emotion-cache-1wivap2 {{
-            color: {COLOR_DARK_BLUE} !important;
-        }}
-
-        /* Tùy chỉnh màu nút bấm */
-        .stButton>button {{
-            background-color: {COLOR_BLUE};
-            color: {COLOR_DARK_BLUE};
-            border-radius: 8px;
-            border: 1px solid {COLOR_DARK_BLUE};
-            padding: 8px 16px;
-            font-weight: 600;
-            transition: all 0.2s ease;
-        }}
-        .stButton>button:hover {{
-            background-color: {COLOR_PINK};
-            border-color: {COLOR_DARK_PINK};
-            color: {COLOR_DARK_PINK};
-        }}
-        
-        /* Box chứa nội dung chính */
-        .main-content-box {{
-            padding: 20px;
-            border-radius: 12px;
-            background-color: white; /* Nền trắng cho nội dung */
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            margin-bottom: 20px;
-            border-left: 5px solid {COLOR_PINK}; /* Điểm nhấn hồng */
-        }}
-        
-        /* Thiết lập màu cho input */
-        .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stDateInput>div>div>input, .stNumberInput>div>div>input {{
-            border-radius: 8px;
-            border: 1px solid {COLOR_BLUE};
-            background-color: {COLOR_LIGHT_GRAY};
-            padding: 8px 10px;
-        }}
-        
-        /* Màu nền cho các tab không được chọn */
-        .st-emotion-cache-13l39w3 {{
-            background-color: {COLOR_BEIGE};
-        }}
-    </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
-
-# --- Logic Chẩn đoán và Nhận xét ---
-
-def get_diagnosis_result(prediction_value):
-    """
-    Trả về kết quả chẩn đoán và lời khuyên dựa trên giá trị giả lập.
-    prediction_value là giá trị từ 0 đến 100.
-    """
-    if prediction_value <= 70:
-        result = "Bình thường"
-        color = "green"
-        advice = """
-            **Đây là một tín hiệu rất tích cực.** Mẹ hãy tiếp tục giữ tinh thần thoải mái, đảm bảo chế độ dinh dưỡng và nghỉ ngơi hợp lý. Vui lòng theo dõi các buổi khám thai định kỳ theo lịch hẹn của bác sĩ để kiểm tra các chỉ số tổng quát khác.
-        """
-    elif 70 < prediction_value <= 90:
-        result = "Nghi ngờ"
-        color = "orange"
-        advice = f"""
-            **Điều này có nghĩa là có một số thay đổi nhỏ cần được chú ý,** mặc dù chưa phải là tình trạng bệnh lý cấp bách. 
-            **KHUYẾN CÁO:** Mẹ không cần quá lo lắng nhưng cần **tái khám hoặc làm thêm các xét nghiệm chuyên sâu** theo chỉ định của bác sĩ để xác nhận lại tình trạng sức khỏe của bé. Tiếp tục theo dõi cử động thai và giữ liên lạc với chuyên viên y tế.
-        """
-    else: # > 90
-        result = "Nguy hiểm"
-        color = "red"
-        advice = f"""
-            **Điều này đồng nghĩa với việc các chỉ số có dấu hiệu bất thường nghiêm trọng** và cần được can thiệp y tế ngay lập tức. 
-            **HÀNH ĐỘNG KHẨN CẤP:** Mẹ cần đến cơ sở y tế gần nhất **ngay lập tức** để được các bác sĩ chuyên khoa thăm khám trực tiếp, đánh giá lâm sàng và có phương án xử lý kịp thời, đảm bảo an toàn tối đa cho cả mẹ và bé.
-        """
-    return result, color, advice
-
-# --- Khởi tạo Trạng thái (Session State) ---
-
-def init_session_state():
-    """Khởi tạo các biến trạng thái cần thiết."""
-    if 'logged_in' not in st.session_state:
-        st.session_state.logged_in = False
-    if 'current_page' not in st.session_state:
-        st.session_state.current_page = "login"
-    if 'user_id' not in st.session_state:
-        st.session_state.user_id = ""
-        
-    # Dữ liệu hồ sơ (Khởi tạo mặc định)
-    if 'profile_data' not in st.session_state:
-        st.session_state.profile_data = {
-            'ho_ten': 'Người dùng',
-            'email_sdt': 'chua_cap_nhat@app.com',
-            'tuoi': 25,
-            'chieu_cao': 160,
-            'can_nang': 55.0,
-            'tien_su_benh': 'Không',
-            'thuoc_su_dung': ['Vitamin tổng hợp', 'Sắt/Axit Folic'],
-            'lan_sinh_thu': 1,
-            'ngay_du_sinh': datetime.date.today() + datetime.timedelta(days=120), # Giả lập còn 120 ngày
-            'tuan_thai_hien_tai': 23,
-        }
-
-    # Lịch sử chẩn đoán
-    if 'diagnosis_history' not in st.session_state:
-        st.session_state.diagnosis_history = pd.DataFrame(columns=[
-            'Ngày - Giờ', 'Kết quả sơ bộ', 'Mức độ', 'Chỉ số cụ thể (Ẩn)', 'Ghi chú'
-        ])
-
-
-# --- Hàm chuyển đổi trang ---
-def navigate_to(page):
-    """Chuyển đổi giữa các trang chính."""
-    st.session_state.current_page = page
-    # st.experimental_rerun() # Không cần dùng rerun nếu dùng sidebar button
-
-# --- Các trang chức năng ---
-
-def login_page():
-    """Màn hình chào mừng và đăng nhập."""
+    /* Title and Header Styling (using Dark Blue for emphasis) */
+    h1, h2, h3 {{
+        color: {COLOR_DARK_BLUE};
+        font-family: 'Inter', sans-serif;
+    }}
     
-    # Thiết lập layout giữa trang
-    st.markdown(f'<div style="display: flex; justify-content: center; align-items: center; min-height: 100vh;">', unsafe_allow_html=True)
+    /* Main container styling for a structured, elegant look */
+    .block-container {{
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 1000px;
+    }}
+
+    /* Style for the main navigation tabs/radio buttons */
+    .stRadio > label {{
+        padding: 10px 15px;
+        margin: 5px;
+        border-radius: 8px;
+        border: 1px solid {COLOR_PINK};
+        color: {COLOR_DARK_BLUE};
+        transition: all 0.2s ease-in-out;
+    }}
+
+    .stRadio > label:hover {{
+        background-color: {COLOR_PINK}20; /* Light hover effect */
+        border-color: {COLOR_DARK_PINK};
+    }}
+
+    /* Styling for the selected radio button (active tab) */
+    .stRadio div[role="radiogroup"] > label:has(input:checked) {{
+        background-color: {COLOR_BLUE};
+        color: white; /* Contrast text on blue background */
+        border-color: {COLOR_DARK_BLUE};
+        font-weight: bold;
+    }}
+
+    /* Styling for the required 'Lưu' (Save) button */
+    .stButton > button {{
+        background-color: {COLOR_PINK};
+        color: white;
+        border-radius: 12px;
+        padding: 10px 20px;
+        font-weight: 600;
+        border: 2px solid {COLOR_DARK_PINK};
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s;
+    }}
+    .stButton > button:hover {{
+        background-color: {COLOR_DARK_PINK};
+        color: white;
+        border-color: {COLOR_DARK_BLUE};
+        box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.2);
+    }}
+
+    /* Style inputs and text areas */
+    .stTextInput>div>div>input, .stTextArea>div>div>textarea {{
+        border: 1px solid {COLOR_BLUE};
+        border-radius: 6px;
+        padding: 10px;
+    }}
+</style>
+"""
+st.markdown(custom_css, unsafe_allow_html=True)
+
+# Set up the main page config
+st.set_page_config(
+    page_title="Fetal ECG Monitoring App",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# --- State Management (Simple Navigation) ---
+if 'page' not in st.session_state:
+    st.session_state.page = 'Trang chủ'
+
+# --- Sidebar for User Info (Mock) ---
+st.sidebar.title("🤰 Fetal Monitoring")
+st.sidebar.markdown(f"**Chào mừng trở lại!**")
+st.sidebar.markdown("---")
+
+# Mock User/Login Info
+st.sidebar.markdown(f"**User:** Nguyễn Thị A")
+st.sidebar.markdown(f"**Email:** user@example.com")
+st.sidebar.button("Đăng xuất", type="secondary")
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("Navigation")
+# Main navigation using st.radio, replacing the need for separate pages for this example
+page = st.sidebar.radio(
+    "Chọn mục:",
+    ('Trang chủ', 'Sổ tay cá nhân', 'Cài đặt'),
+    index=['Trang chủ', 'Sổ tay cá nhân', 'Cài đặt'].index(st.session_state.page),
+    key='main_nav'
+)
+st.session_state.page = page
+
+# --- Main Content Area ---
+
+st.title("Ứng Dụng Theo Dõi Điện Tim Thai Nhi")
+
+if st.session_state.page == 'Trang chủ':
+    st.header("Trang Chủ")
+    st.markdown("### Màn hình chính")
     
-    st.markdown(f'<div class="main-content-box" style="width: 350px; padding: 40px; text-align: center;">', unsafe_allow_html=True)
-    st.markdown(f"## Chào mừng bạn quay trở lại!", unsafe_allow_html=True)
-    st.markdown("---")
+    # Use columns to lay out the three profile sections nicely
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.subheader("Hồ sơ mẹ")
+        with st.container(border=True):
+            st.markdown(f"**Họ và tên:** *Chưa cập nhật*")
+            st.markdown(f"**Tuổi:** *Chưa cập nhật*")
+            st.markdown(f"**Chiều cao/Cân nặng:** *Chưa cập nhật*")
+            st.markdown(f"**Tiền sử bệnh:** *Không*")
+            st.markdown(f"**Thuốc đang sử dụng:** *Không*")
+            if st.button("Cập nhật Hồ sơ mẹ", key="update_mother_btn"):
+                st.info("Chức năng cập nhật sẽ được mở trong giao diện chi tiết.")
+            st.button("Lưu (Mẹ)", key="save_mother") # Required Save button
+
+    with col2:
+        st.subheader("Hồ sơ bé")
+        with st.container(border=True):
+            st.markdown(f"**Lần sinh thứ:** *Lần 1*")
+            st.markdown(f"**Tuần thai hiện tại:** **28 tuần**")
+            st.markdown(f"**Ngày dự sinh:** *XX/YY/ZZZZ*")
+            if st.button("Cập nhật Hồ sơ bé", key="update_baby_btn"):
+                st.info("Chức năng cập nhật sẽ được mở trong giao diện chi tiết.")
+            st.button("Lưu (Bé)", key="save_baby") # Required Save button
+
+    with col3:
+        st.subheader("Hồ sơ đo điện tim")
+        with st.container(border=True):
+            st.markdown(f"**Lần đo gần nhất:** 07/12/2025")
+            st.markdown(f"**Kết quả sơ bộ:** **Bình thường**")
+            st.markdown(f"**Nhịp tim thai (FHR):** 145 bpm")
+            if st.button("Xem Chi tiết/Đo mới", key="view_ecg_btn"):
+                st.info("Chức năng xem chi tiết kết quả điện tim.")
+            st.button("Lưu (ECG)", key="save_ecg") # Required Save button
+
+elif st.session_state.page == 'Sổ tay cá nhân':
+    st.header("Sổ Tay Cá Nhân")
+
+    st.subheader("Lịch sử theo dõi")
+    st.markdown("Đây là nơi tự động lưu trữ các lần chẩn đoán và nhật ký thuốc.")
+
+    tab_history, tab_medicine = st.tabs(["Lịch sử chẩn đoán", "Nhật kí thuốc"])
+
+    with tab_history:
+        st.markdown("#### Lịch sử Chẩn Đoán")
+        st.info("Click vào một lần chẩn đoán để xem chi tiết các chỉ số và ghi chú.")
+        st.dataframe({
+            'Ngày - Giờ': ['07/12/2025 10:30', '30/11/2025 14:00'],
+            'Kết quả sơ bộ': ['Bình thường', 'Nghi ngờ (Nhẹ)'],
+            'Ghi chú': ['Không có', 'Uống đủ nước hơn'],
+        }, use_container_width=True)
+
+    with tab_medicine:
+        st.markdown("#### Nhật Kí Thuốc")
+        st.markdown("Danh sách thuốc đang sử dụng (nhập từ hồ sơ mẹ hoặc đã thêm).")
+        st.text_area("Thuốc đã nhập:", value="Vitamin tổng hợp\nSắt/Folic Acid", height=100)
+        new_medicine = st.text_input("Thêm thuốc mới:")
+        if st.button("+ Thêm", key="add_medicine_btn"):
+            if new_medicine:
+                st.success(f"Đã thêm: {new_medicine}")
+            else:
+                st.warning("Vui lòng nhập tên thuốc.")
+        st.button("Lưu (Thuốc)", key="save_medicine") # Required Save button
+
+    st.subheader("Mẹo Chăm Sóc Thai Kì")
     
-    # Sử dụng form để tạo nhóm input và button
-    with st.form("login_form", clear_on_submit=False):
-        # Email/SĐT
-        email = st.text_input("Email hoặc số điện thoại", key="email_input", placeholder="Nhập email hoặc số điện thoại")
-        
-        # Mật khẩu
-        password = st.text_input("Mật khẩu", type="password", key="password_input", placeholder="Nhập mật khẩu") 
+    st.markdown("#### Hướng dẫn mẹ theo dõi thai kì hiệu quả")
+    st.info("Hãy luôn giữ tâm lý thoải mái, theo dõi cử động thai nhi đều đặn và thăm khám định kỳ. Việc theo dõi thai kì cần được thực hiện trong môi trường yên tĩnh.")
 
-        st.markdown(
-            f"""
-            <div style="font-size: 14px; text-align: right; margin-bottom: 20px;">
-                <a href="#" style="color: {COLOR_DARK_BLUE};">Quên mật khẩu?</a>
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
+    st.markdown("#### Dinh dưỡng, bài tập")
+    col_advice1, col_advice2 = st.columns(2)
+    with col_advice1:
+        st.markdown("**Dinh Dưỡng Đề Xuất**")
+        st.markdown("1. Bổ sung Protein (trứng, thịt nạc).")
+        st.markdown("2. Ăn nhiều rau xanh và trái cây.")
+        st.markdown("3. Uống đủ $2 - 2.5$ lít nước mỗi ngày.")
+    with col_advice2:
+        st.markdown("**Bài Tập & Massage**")
+        st.markdown("1. Yoga nhẹ nhàng cho bà bầu.")
+        st.markdown("2. Đi bộ $30$ phút mỗi ngày.")
+        st.markdown("3. Massage lưng và chân để giảm đau nhức.")
+    st.button("Lưu (Mẹo)", key="save_tips") # Required Save button
 
-        login_button = st.form_submit_button("Đăng nhập", type="primary", use_container_width=True)
+elif st.session_state.page == 'Cài đặt':
+    st.header("Cài Đặt")
+    st.subheader("Thông tin tài khoản")
 
-    if login_button:
-        if email and password:
-            # Giả lập đăng nhập thành công
-            st.session_state.logged_in = True
-            st.session_state.user_id = email
-            st.session_state.profile_data['email_sdt'] = email
-            navigate_to("home")
-            st.experimental_rerun()
-        else:
-            st.error("Vui lòng nhập đầy đủ Email/SĐT và Mật khẩu.")
-
-    st.markdown("<hr style='border: 1px solid #ccc; margin-top: 20px;'>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; font-size: 14px;'>Hoặc tiếp tục với</p>", unsafe_allow_html=True)
+    col_info1, col_info2 = st.columns([1, 2])
     
-    # Giả lập các nút đăng nhập khác 
-    col_x, col_y = st.columns([1, 1])
-    with col_x:
-         if st.button("Tạm thời bỏ qua", key="skip_login", use_container_width=True):
-             # Giả lập đăng nhập bỏ qua
-             st.session_state.logged_in = True
-             st.session_state.user_id = "guest@app.com"
-             navigate_to("home")
-             st.experimental_rerun()
-             
-    with col_y:
-        # Nút tạo tài khoản mới 
-        if st.button("Tạo Tài Khoản Mới", key="create_account_btn", use_container_width=True):
-            st.info("Chức năng tạo tài khoản mới đang được phát triển.")
+    with col_info1:
+        st.markdown("Ảnh đại diện (Mô phỏng)")
+        # Placeholder for profile picture
+        st.image("https://placehold.co/150x150/A9D6E5/1B4965?text=Ảnh+ĐD", width=150)
+        st.button("Thay đổi ảnh", key="change_pic_btn")
 
-    st.markdown(
-        f"""
-        <div style="text-align: center; margin-top: 30px; font-size: 14px;">
-            <span style="margin-right: 15px;"><a href="#" style="color: {COLOR_DARK_BLUE};">Hỗ trợ</a></span>
-            <span style="margin-right: 15px;"><a href="#" style="color: {COLOR_DARK_BLUE};">Chính sách bảo mật</a></span>
-            <span><a href="#" style="color: {COLOR_DARK_BLUE};">Điều khoản sử dụng</a></span>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-
-def home_page():
-    """Trang chủ bao gồm các hồ sơ mẹ, bé và điện tim."""
-    st.title("Trang Chủ")
-    st.markdown("---")
-
-    st.header(f"Tuần Thai Hiện Tại: <span style='color: {COLOR_DARK_PINK}; font-weight: 700;'>Tuần {st.session_state.profile_data.get('tuan_thai_hien_tai', 0)}</span>", unsafe_allow_html=True)
-    
-    tab1, tab2, tab3 = st.tabs(["Hồ sơ Mẹ", "Hồ sơ Bé", "Chẩn đoán Điện Tim"])
-
-    # 1. Hồ sơ Mẹ
-    with tab1:
-        st.markdown(f'<div class="main-content-box">', unsafe_allow_html=True)
-        st.subheader("Cập nhật Hồ sơ Mẹ")
+    with col_info2:
+        st.text_input("User Name", value="Nguyễn Thị A")
+        st.text_input("Email", value="user@example.com", disabled=True)
+        st.text_input("Số điện thoại", value="090-XXX-YYY")
         
-        with st.form("mother_profile_form"):
-            col_a, col_b = st.columns(2)
-            temp_data = st.session_state.profile_data
-
-            with col_a:
-                ho_ten = st.text_input("Họ và Tên", value=temp_data['ho_ten'])
-                chieu_cao = st.number_input("Chiều cao (cm)", min_value=100, max_value=250, value=temp_data['chieu_cao'], step=1)
-                tien_su_benh = st.text_area("Tiền sử bệnh", value=temp_data['tien_su_benh'], height=100)
-
-            with col_b:
-                tuoi = st.number_input("Tuổi", min_value=15, max_value=60, value=temp_data['tuoi'], step=1)
-                can_nang = st.number_input("Cân nặng hiện tại (kg)", min_value=30.0, max_value=200.0, value=temp_data['can_nang'], step=0.1)
-                
-                # Hiển thị nhật ký thuốc dưới dạng text area (nhưng cho phép chỉnh sửa bằng form)
-                meds_text = st.text_area(
-                    "Thuốc đang sử dụng (nhập cách nhau bằng dấu phẩy)", 
-                    value=", ".join(temp_data['thuoc_su_dung']), 
-                    height=100
-                )
-            
-            submitted_mother = st.form_submit_button("Lưu Hồ Sơ Mẹ", type="primary")
-
-            if submitted_mother:
-                # Cập nhật dữ liệu vào session state
-                st.session_state.profile_data.update({
-                    'ho_ten': ho_ten,
-                    'tuoi': tuoi,
-                    'chieu_cao': chieu_cao,
-                    'can_nang': can_nang,
-                    'tien_su_benh': tien_su_benh,
-                    'thuoc_su_dung': [m.strip() for m in meds_text.split(',')]
-                })
-                st.success("Đã lưu Hồ sơ Mẹ thành công!")
-                # Không cần rerun nếu chỉ cập nhật state và muốn giao diện ở tab này giữ nguyên
-                # st.experimental_rerun() 
-        st.markdown('</div>', unsafe_allow_html=True)
-
-
-    # 2. Hồ sơ Bé
-    with tab2:
-        st.markdown(f'<div class="main-content-box">', unsafe_allow_html=True)
-        st.subheader("Thông tin Thai kỳ và Hồ sơ Bé")
-
-        with st.form("baby_profile_form"):
-            col_c, col_d = st.columns(2)
-            temp_data = st.session_state.profile_data
-            
-            # Khởi tạo giá trị ban đầu cho các biến
-            ngay_du_sinh_hien_tai = temp_data['ngay_du_sinh']
-            tuan_thai_hien_tai = temp_data['tuan_thai_hien_tai']
-
-            with col_c:
-                lan_sinh_thu = st.number_input("Lần sinh thứ", min_value=1, max_value=10, value=temp_data['lan_sinh_thu'], step=1)
-                
-                # Lấy ngày dự sinh từ input
-                ngay_du_sinh_moi = st.date_input("Ngày dự sinh (Dự kiến)", value=ngay_du_sinh_hien_tai)
-
-                # Tính toán lại tuần thai
-                today = datetime.date.today()
-                if ngay_du_sinh_moi:
-                    # Giả định thai kỳ 40 tuần (280 ngày)
-                    total_days = 40 * 7 
-                    days_remaining = (ngay_du_sinh_moi - today).days
-                    days_passed = total_days - days_remaining
-                    # Đảm bảo tuần thai không âm và không vượt quá 40
-                    tuan_thai_hien_tai = max(0, min(40, days_passed // 7))
-                    
-                    # Cập nhật state tạm thời để hiển thị ngay
-                    st.session_state.profile_data['tuan_thai_hien_tai'] = tuan_thai_hien_tai
-                    
-                    st.markdown(f"**Tuần thai hiện tại (Tự tính):** <span style='color: {COLOR_DARK_PINK}; font-size: 20px; font-weight: 700;'>Tuần {tuan_thai_hien_tai}</span>", unsafe_allow_html=True)
-                
-            with col_d:
-                # Cân nặng ước tính theo tuần thai (Giả lập)
-                weight_estimate_g = max(10, (tuan_thai_hien_tai - 12) * 250 + 50) # Bắt đầu tính từ tuần 12
-                
-                st.markdown(f"**Cân nặng ước tính:** <span style='color: {COLOR_DARK_BLUE}; font-size: 20px; font-weight: 700;'>{weight_estimate_g/1000:.2f} kg</span>", unsafe_allow_html=True)
-                
-                # Mục này chỉ hiển thị, không cho chỉnh sửa trực tiếp
-                st.markdown("**Các mốc phát triển quan trọng:** (Tự động theo Tuần)")
-                if tuan_thai_hien_tai < 12:
-                    st.info("Quý 1: Giai đoạn hình thành cơ quan quan trọng.")
-                elif tuan_thai_hien_tai < 28:
-                    st.info("Quý 2: Giai đoạn phát triển cơ thể và giác quan.")
-                elif tuan_thai_hien_tai < 40:
-                    st.info("Quý 3: Giai đoạn hoàn thiện phổi và tăng tốc cân nặng.")
-                else:
-                    st.success("Thai đủ tháng! Sẵn sàng chào đón bé yêu.")
-
-
-            submitted_baby = st.form_submit_button("Lưu Hồ Sơ Bé", type="primary")
-
-            if submitted_baby:
-                st.session_state.profile_data.update({
-                    'lan_sinh_thu': lan_sinh_thu,
-                    'ngay_du_sinh': ngay_du_sinh_moi,
-                    'tuan_thai_hien_tai': tuan_thai_hien_tai, # Lưu giá trị đã tính toán
-                })
-                st.success("Đã lưu Hồ sơ Bé thành công!")
-                # Không cần rerun
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-    # 3. Chẩn đoán Điện Tim
-    with tab3:
-        st.markdown(f'<div class="main-content-box">', unsafe_allow_html=True)
-        st.subheader("C. Chẩn đoán sơ bộ bằng AI")
-        st.info("Đây là công cụ hỗ trợ. Kết quả cuối cùng phải dựa trên đánh giá của bác sĩ.")
-        
-        # --- Mục Tải Dữ liệu ---
-        st.markdown("#### 1. Tải Dữ liệu (File ECG/CTG)")
-        ecg_data = st.file_uploader("Tải lên file dữ liệu (Ví dụ: .csv, .txt)", type=['txt', 'csv'])
-        
-        # --- Mục Nhập Dữ liệu tùy chỉnh ---
-        st.markdown("#### 2. Nhập Dữ liệu Tùy chỉnh (21 Chỉ số CTG)")
-        
-        # Tạo nút để hiện/ẩn form nhập dữ liệu
-        if 'show_input_form' not in st.session_state:
-            st.session_state.show_input_form = False
-            
-        # Nút hiện/ẩn form
-        if st.button("Nhấp vào đây để Nhập 21 Chỉ Số", key="toggle_input", use_container_width=True):
-            st.session_state.show_input_form = not st.session_state.show_input_form
-
-        input_data = {}
-
-        if st.session_state.show_input_form:
-            st.markdown("---")
-            st.markdown("##### Nhập các chỉ số theo kết quả máy đo:")
-            with st.form("manual_input_form"):
-                cols = st.columns(3)
-                # Thiết lập các giá trị mặc định cho 21 chỉ số
-                default_values = [120.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 73.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 120.0]
-                
-                for i, feature in enumerate(MODEL_FEATURE_NAMES):
-                    with cols[i % 3]:
-                        # Sử dụng các giá trị mặc định đã định sẵn
-                        input_data[feature] = st.number_input(feature, value=default_values[i], step=0.01, key=f"input_{i}")
-
-                ghi_chu = st.text_area("Ghi chú của mẹ về lần đo/kiểm tra này", value="", height=50)
-                
-                submitted_diagnosis = st.form_submit_button("Gửi Dữ Liệu & Chẩn Đoán", type="primary", use_container_width=True)
-                
-                if submitted_diagnosis:
-                    # Giả lập kết quả AI (random 50-100 để có cả 3 trường hợp)
-                    mock_prediction = np.random.randint(50, 101) 
-                    
-                    # 1. Lấy kết quả chẩn đoán và lời khuyên
-                    result, color, advice = get_diagnosis_result(mock_prediction)
-                    
-                    # 2. Chuẩn bị dữ liệu để lưu
-                    diagnosis_details = "\n".join([f"{k}: {v}" for k, v in input_data.items()])
-                    
-                    new_diagnosis = {
-                        'Ngày - Giờ': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        'Kết quả sơ bộ': result,
-                        'Mức độ': mock_prediction, # Lưu mức độ dưới dạng số để sort và phân loại
-                        'Chỉ số cụ thể (Ẩn)': diagnosis_details,
-                        'Ghi chú': ghi_chu if ghi_chu else 'Không có'
-                    }
-                    
-                    # Lưu vào Lịch sử (Session State)
-                    new_df = pd.DataFrame([new_diagnosis])
-                    st.session_state.diagnosis_history = pd.concat([st.session_state.diagnosis_history, new_df], ignore_index=True)
-                    
-                    st.success("Đã gửi dữ liệu và nhận kết quả chẩn đoán!")
-                    st.session_state.last_diagnosis_result = {'result': result, 'color': color, 'advice': advice, 'time': new_diagnosis['Ngày - Giờ']}
-                    
-                    # Tắt form nhập liệu và cập nhật giao diện
-                    st.session_state.show_input_form = False
-                    st.experimental_rerun()
-        
-        # --- Mục Hiển thị Kết quả Chẩn đoán ---
-        if 'last_diagnosis_result' in st.session_state:
-            res = st.session_state.last_diagnosis_result
-            
-            st.markdown(f"#### 3. Kết Quả Chẩn Đoán Sơ Bộ ({res['time']})")
-            
-            # Khung kết quả chẩn đoán to rõ ràng
-            st.markdown(f'<div style="background-color: {COLOR_LIGHT_GRAY}; padding: 25px; border-radius: 12px; border: 2px solid {res["color"]};">', unsafe_allow_html=True)
-            
-            st.markdown(f"**<span style='color: {COLOR_DARK_BLUE}; font-size: 24px;'>Kết quả chẩn đoán:</span>**", unsafe_allow_html=True)
-            st.markdown(f"### <span style='color: {res['color']}; font-weight: 800;'>{res['result'].upper()}</span>", unsafe_allow_html=True)
-            
-            st.markdown(f"<p style='color: {COLOR_DARK_BLUE};'>Các chỉ số cho thấy:</p>", unsafe_allow_html=True)
-            
-            # Hiển thị lời nhận xét
-            st.markdown(f"<p style='color: {COLOR_DARK_BLUE}; font-weight: 500;'>{res['advice']}</p>", unsafe_allow_html=True)
-
-            st.markdown('</div>', unsafe_allow_html=True)
-
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-
-def handbook_page():
-    """Sổ tay cá nhân: Lịch sử theo dõi, Nhật kí thuốc, Mẹo thai kì."""
-    st.title("Sổ Tay Cá Nhân")
-    st.markdown("---")
-
-    tab1, tab2 = st.tabs(["Lịch sử - Theo dõi", "Mẹo Chăm sóc Thai kì"])
-
-    # 1. Lịch sử - Theo dõi
-    with tab1:
-        st.markdown(f'<div class="main-content-box">', unsafe_allow_html=True)
-        st.subheader("1. Lịch sử Chẩn đoán & Theo dõi")
-        
-        history_df = st.session_state.diagnosis_history.sort_values(by='Ngày - Giờ', ascending=False).reset_index(drop=True)
-        
-        if history_df.empty:
-            st.info("Chưa có lịch sử chẩn đoán nào được lưu.")
-        else:
-            for index, row in history_df.iterrows():
-                result, color, _ = get_diagnosis_result(row['Mức độ'])
-                
-                with st.expander(f"Lần chẩn đoán: {row['Ngày - Giờ']} - Kết quả: **{result}**"):
-                    st.write(f"**Ngày - Giờ chẩn đoán:** {row['Ngày - Giờ']}")
-                    
-                    st.markdown(f"**Kết quả sơ bộ:** <span style='color: {color}; font-weight: 600;'>{result}</span>", unsafe_allow_html=True)
-                    
-                    # Chỉ số cụ thể (tạm thời ẩn, khi click sẽ hiện ra)
-                    with st.expander("Xem Chỉ số Cụ thể (21 chỉ số)"):
-                        st.text_area("Chỉ số chi tiết:", value=row['Chỉ số cụ thể (Ẩn)'], height=150, disabled=True)
-                        
-                    st.write(f"**Ghi chú:** {row['Ghi chú']}")
-
         st.markdown("---")
         
-        st.subheader("2. Nhật ký Thuốc")
+        st.subheader("Bảo mật")
+        st.text_input("Thay đổi mật khẩu", type="password", help="Nhập mật khẩu mới")
+        st.text_input("Xác nhận mật khẩu", type="password")
         
-        current_meds = st.session_state.profile_data['thuoc_su_dung']
+    st.button("Lưu (Cài đặt)", key="save_settings") # Required Save button
 
-        st.markdown("##### 💊 Danh sách thuốc đã nhập:")
-        
-        # Chỉ hiển thị các mục không rỗng
-        display_meds = [m for m in current_meds if m.strip()]
-        
-        if display_meds:
-            for med in display_meds:
-                st.markdown(f"- <span style='color: {COLOR_DARK_BLUE}; font-weight: 500;'>{med}</span>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"*Chưa có thuốc nào được nhập.*", unsafe_allow_html=True)
-            
-        st.markdown("---")
-        
-        st.markdown("##### Thêm thuốc/thực phẩm chức năng mới")
-        with st.form("add_med_form", clear_on_submit=True):
-            new_med = st.text_input("Tên thuốc/TPCN mới", key="new_med_input")
-            if st.form_submit_button("+ Thêm", type="primary", key="add_med_btn"):
-                if new_med and new_med.strip() not in [m.strip() for m in current_meds]:
-                    st.session_state.profile_data['thuoc_su_dung'].append(new_med.strip())
-                    st.success(f"Đã thêm '{new_med.strip()}' vào nhật ký.")
-                    st.experimental_rerun()
-                elif new_med.strip() in [m.strip() for m in current_meds]:
-                     st.warning("Thuốc này đã có trong danh sách.")
-                else:
-                    st.error("Vui lòng nhập tên thuốc.")
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-
-    # 2. Mẹo Chăm sóc Thai kì (Thông tin tĩnh)
-    with tab2:
-        st.markdown(f'<div class="main-content-box">', unsafe_allow_html=True)
-        st.subheader("💡 Mẹo Chăm sóc Thai kì")
-        
-        st.markdown(f"#### 1. Hướng dẫn mẹ theo dõi thai kì hiệu quả", unsafe_allow_html=True)
-        st.info(
-            "Việc theo dõi thai kỳ cần được thực hiện đều đặn. Mẹ nên ghi chép lại mọi thay đổi của cơ thể, các chỉ số đo được và lịch sử tiêm chủng/khám thai. Hãy chuẩn bị tâm lý thoải mái, tham gia các lớp học tiền sản và luôn sẵn sàng trao đổi với bác sĩ về mọi lo lắng của mình. **Đừng quên theo dõi cử động của bé mỗi ngày.**"
-        )
-
-        st.markdown(f"#### 2. Dinh dưỡng và Bài tập", unsafe_allow_html=True)
-        col_e, col_f = st.columns(2)
-        
-        with col_e:
-            st.markdown("**🍲 Dinh Dưỡng Đề Xuất:**", unsafe_allow_html=True)
-            st.markdown(f"""
-                <ul style="color: {COLOR_DARK_BLUE}; padding-left: 20px;">
-                    <li>**Sắt và Axit Folic:** Rất quan trọng trong 3 tháng đầu.</li>
-                    <li>**Canxi:** Sữa, sữa chua, phô mai.</li>
-                    <li>**Protein và Chất Xơ:** Thịt nạc, cá, trứng và các loại hạt.</li>
-                </ul>
-            """, unsafe_allow_html=True)
-            
-        with col_f:
-            st.markdown("**🤸 Bài Tập Sức Khỏe:**", unsafe_allow_html=True)
-            st.markdown(f"""
-                <ul style="color: {COLOR_DARK_BLUE}; padding-left: 20px;">
-                    <li>**Đi bộ:** 30 phút mỗi ngày.</li>
-                    <li>**Bơi lội:** Giảm áp lực lên khớp.</li>
-                    <li>**Yoga/Pilates:** Các bài tập nhẹ nhàng, chuyên biệt cho bà bầu.</li>
-                </ul>
-            """, unsafe_allow_html=True)
-        
-        st.markdown(f"#### 3. Massage Cơ Thể", unsafe_allow_html=True)
-        st.caption("Massage giúp giảm sưng phù và thư giãn tinh thần.")
-        st.markdown(f"""
-            <ul style="color: {COLOR_DARK_BLUE}; padding-left: 20px;">
-                <li>**Chân và Bàn chân:** Giúp lưu thông máu.</li>
-                <li>**Vùng lưng dưới:** Giảm đau lưng.</li>
-                <li>**Vai và Cổ:** Thư giãn cơ.</li>
-            </ul>
-        """, unsafe_allow_html=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-
-
-def settings_page():
-    """Cài đặt: Thông tin tài khoản, thay đổi mật khẩu, Dấu hiệu cảnh báo."""
-    st.title("Cài Đặt")
     st.markdown("---")
-    
-    tab1, tab2 = st.tabs(["Thông tin Tài khoản", "Dấu hiệu Cảnh báo"])
-
-    with tab1:
-        st.markdown(f'<div class="main-content-box">', unsafe_allow_html=True)
-        st.subheader("Thông tin Tài khoản")
-        
-        st.markdown(f"**👤 Tên tài khoản:** <span style='color: {COLOR_DARK_BLUE};'>{st.session_state.profile_data.get('ho_ten', 'Người dùng')}</span>", unsafe_allow_html=True)
-        st.markdown(f"**📧 Email/Số điện thoại:** <span style='color: {COLOR_DARK_BLUE};'>{st.session_state.user_id}</span>", unsafe_allow_html=True)
-        
-        st.markdown("---")
-
-        with st.form("settings_form"):
-            st.markdown("##### Thay đổi Mật khẩu")
-            # Yêu cầu không dùng chi tiết icon
-            mk_cu = st.text_input("Mật khẩu cũ", type="password")
-            mk_moi = st.text_input("Mật khẩu mới", type="password")
-            xac_nhan_mk_moi = st.text_input("Xác nhận Mật khẩu mới", type="password")
-            
-            col_g, col_h = st.columns([1, 2])
-            
-            with col_g:
-                if st.form_submit_button("Lưu Thay Đổi", type="primary"):
-                    if mk_moi and mk_moi == xac_nhan_mk_moi and len(mk_moi) >= 6:
-                        st.success("Đã thay đổi mật khẩu thành công (Giả lập).")
-                    else:
-                        st.error("Mật khẩu mới không khớp hoặc quá ngắn (tối thiểu 6 ký tự).")
-            
-            with col_h:
-                if st.button("Đăng Xuất", key="logout_btn"):
-                    st.session_state.logged_in = False
-                    st.session_state.current_page = "login"
-                    st.experimental_rerun()
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with tab2:
-        st.markdown(f'<div class="main-content-box">', unsafe_allow_html=True)
-        st.subheader("⚠️ Dấu hiệu Cảnh báo nguy hiểm")
-        st.warning("Đây là các dấu hiệu cần được quan tâm đặc biệt.")
-        
-        st.markdown(f"""
-        <ul style="color: {COLOR_DARK_BLUE}; font-weight: 500; padding-left: 20px;">
-            <li>Chảy máu âm đạo bất thường (nhiều hoặc đỏ tươi).</li>
-            <li>Đau bụng dưới dữ dội, co thắt liên tục.</li>
-            <li>Sốt cao (trên 38.5°C) không rõ nguyên nhân.</li>
-            <li>Phù nề nghiêm trọng ở mặt, tay chân kèm theo tăng huyết áp.</li>
-            <li>Giảm hoặc mất hoàn toàn cử động thai (sau tuần thứ 28).</li>
-            <li>Nôn mửa kéo dài không kiểm soát được.</li>
-        </ul>
-        """, unsafe_allow_html=True)
-
-        st.markdown("---")
-        st.markdown(f"<p style='color: {COLOR_DARK_PINK}; font-weight: 700;'>Khi xuất hiện các dấu hiệu bất thường này, mẹ nên liên hệ người nhà và đưa đến cơ sở y tế gần nhất NGAY LẬP TỨC để được các bác sĩ chuyên khoa thăm khám trực tiếp.</p>", unsafe_allow_html=True)
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-
-# --- Chạy ứng dụng chính ---
-def main():
-    """Hàm chính điều khiển luồng ứng dụng."""
-    
-    # 1. Khởi tạo
-    init_session_state()
-    st.set_page_config(page_title="App Theo Dõi Thai Kỳ (Mẹ & Bé)", layout="wide")
-    apply_custom_css()
-
-    # 2. Xử lý logic đăng nhập
-    if not st.session_state.logged_in:
-        # Nếu chưa đăng nhập, hiển thị trang đăng nhập
-        login_page()
-        return
-
-    # 3. Thanh điều hướng (Sidebar)
-    st.sidebar.title("🤰 Menu Ứng Dụng")
-    st.sidebar.markdown(f"**Tài khoản:** *{st.session_state.profile_data['ho_ten']}*")
-    st.sidebar.markdown("---")
-    
-    nav_options = {
-        "home": "🏠 Trang Chủ",
-        "handbook": "📖 Sổ Tay Cá Nhân",
-        "settings": "⚙️ Cài Đặt"
-    }
-    
-    # Đảm bảo trang hiện tại nằm trong các tùy chọn
-    if st.session_state.current_page not in nav_options:
-        st.session_state.current_page = "home"
-        
-    # Sử dụng radio/select box để tạo hiệu ứng chọn trang tốt hơn trong Streamlit
-    selected_page = st.sidebar.radio(
-        "Chọn Trang", 
-        options=list(nav_options.keys()), 
-        format_func=lambda x: nav_options[x],
-        index=list(nav_options.keys()).index(st.session_state.current_page)
-    )
-    
-    # Cập nhật trang khi chọn
-    st.session_state.current_page = selected_page
-    
-    st.sidebar.markdown("---")
-    if st.sidebar.button("Đăng Xuất", key="sidebar_logout", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.current_page = "login"
-        st.experimental_rerun()
-
-    # 4. Hiển thị trang hiện tại
-    page_functions = {
-        "home": home_page,
-        "handbook": handbook_page,
-        "settings": settings_page,
-    }
-    
-    page_functions[st.session_state.current_page]()
-
-if __name__ == '__main__':
-    main()
+    st.subheader("Chính sách & Pháp lý")
+    st.markdown("Đọc **Điều khoản dịch vụ** và **Chính sách bảo mật**.")
