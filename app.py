@@ -66,8 +66,9 @@ custom_css = f"""
         border: 1px solid {COLOR_DARK_PINK} !important;
         color: white !important;
     }}
+    /* Đã sửa lỗi: Sử dụng biến COLOR_LIGHT_PINK thay vì COLOR_PINK */
     button[kind="primary"]:hover {{
-        background-color: {COLOR_LIGHT_PINK} !important; /* Đã sửa lỗi: Dùng biến có sẵn */
+        background-color: {COLOR_LIGHT_PINK} !important;
         border: 1px solid {COLOR_DARK_PINK} !important;
         color: {COLOR_DARK_BLUE} !important;
     }}
@@ -110,6 +111,10 @@ if 'current_page' not in st.session_state:
     st.session_state.current_page = 'Đăng nhập'
 if 'username' not in st.session_state:
     st.session_state.username = "Mẹ"
+if 'diagnosis' not in st.session_state:
+    st.session_state.diagnosis = None
+if 'diagnosis_time' not in st.session_state:
+    st.session_state.diagnosis_time = None
 
 # Dữ liệu mẫu (mock) cho 21 chỉ số CTG/FHR
 CTG_FEATURES = [
@@ -144,12 +149,12 @@ def login_page():
         email_sdt = st.text_input("Email hoặc số điện thoại", placeholder="Nhập email hoặc số điện thoại")
         
         # Mật khẩu (Có chi tiết mắt)
-        # Streamlit không hỗ trợ icon mắt trực tiếp. Dùng text input type="password" là cách mô phỏng gần nhất.
         password = st.text_input("Mật khẩu", placeholder="Nhập mật khẩu", type="password")
         
         st.markdown(
             '<div style="text-align: right; margin-top: -10px; margin-bottom: 20px; font-size: 0.9em;">'
             '<a href="#" style="color: #6C757D;">Quên mật khẩu?</a>'
+            '<div style="height: 10px;"></div>' # Thêm khoảng trống nhỏ cho nút "Đăng nhập"
             '</div>', unsafe_allow_html=True
         )
         
@@ -171,12 +176,12 @@ def login_page():
     
     st.markdown('<div style="margin-top: 30px; text-align: center; color: #6C757D;">Hoặc tiếp tục với</div>', unsafe_allow_html=True)
     
-    # Nút đăng nhập phụ
-    col_social1, col_social2 = st.columns(2)
-    with col_social1:
-        st.button("Google", use_container_width=True, key="google_login")
-    with col_social2:
-        st.button("Apple ID", use_container_width=True, key="apple_login")
+    # --- CẬP NHẬT: Thay thế Đăng nhập xã hội bằng Chế độ Demo ---
+    if st.button("Sử dụng Chế độ Demo (Không cần tài khoản)", use_container_width=True, key="demo_login", type="primary"):
+        st.session_state.logged_in = True
+        st.session_state.current_page = 'Trang chủ'
+        st.session_state.username = "Khách (Demo)"
+        st.rerun()
 
     st.markdown("---")
     
@@ -212,6 +217,8 @@ def sidebar_navigation():
     if st.sidebar.button("Đăng xuất", type="secondary"):
         st.session_state.logged_in = False
         st.session_state.current_page = 'Đăng nhập'
+        st.session_state.diagnosis = None # Reset trạng thái chẩn đoán
+        st.session_state.diagnosis_time = None
         st.rerun()
 
 def home_page():
@@ -229,9 +236,10 @@ def home_page():
             st.number_input("Chiều cao (cm)", min_value=100.0, value=158.0, step=0.1)
             st.number_input("Cân nặng (kg)", min_value=30.0, value=55.0, step=0.1)
             st.text_area("Tiền sử bệnh", value="Tiểu đường thai kỳ (Kiểm soát tốt)")
-            st.text_area("Thuốc đang sử dụng", value="Vitamin tổng hợp, Folic Acid", key="mother_meds")
+            # Sử dụng key mới để tránh xung đột với phần cài đặt
+            st.text_area("Thuốc đang sử dụng", value="Vitamin tổng hợp, Folic Acid", key="mother_meds_home")
             
-            # Nút Lưu BẮT BUỘT (Dùng key khác để tránh xung đột)
+            # Nút Lưu BẮT BUỘC (Dùng key khác để tránh xung đột)
             st.button("Lưu Hồ sơ mẹ", key="save_mother", type="primary", use_container_width=True)
 
     # --- 2. HỒ SƠ BÉ ---
@@ -241,18 +249,27 @@ def home_page():
             st.selectbox("Lần sinh thứ", options=['Lần 1', 'Lần 2', 'Lần 3+'], index=0)
             
             # Tính Tuần thai tự động (Mock)
-            due_date = st.date_input("Ngày dự sinh", value=pd.to_datetime('2026-03-01'), key="due_date")
+            # Khởi tạo giá trị nếu chưa có (tránh lỗi khi rerun)
+            if 'due_date' not in st.session_state:
+                st.session_state.due_date = pd.to_datetime('2026-03-01')
+                
+            due_date = st.date_input("Ngày dự sinh", value=st.session_state.due_date, key="due_date_input")
+            st.session_state.due_date = pd.to_datetime(due_date)
+            
+            # Giả định ngày hôm nay là một ngày cố định (hoặc lấy ngày hiện tại)
             today = pd.to_datetime('2025-12-08')
-            days_to_due = (due_date - today).days
-            # Giả sử thai đủ tháng là 280 ngày (40 tuần)
+            days_to_due = (st.session_state.due_date - today).days
             
             if days_to_due >= 0:
                 days_since_start = 280 - days_to_due
                 current_week = days_since_start / 7
             else:
-                current_week = 40 # Thai đã quá ngày dự sinh
+                current_week = 40 + abs(days_to_due) / 7 # Thai đã quá ngày dự sinh
             
-            st.markdown(f"**Tuần thai hiện tại:** **{int(current_week)} tuần**")
+            # Đảm bảo tuần thai hiển thị ở mức hợp lý
+            current_week_display = max(0, int(current_week))
+            
+            st.markdown(f"**Tuần thai hiện tại:** **{current_week_display} tuần**")
             
             st.number_input("Cân nặng ước tính (gram)", min_value=100.0, value=1500.0, step=10.0)
             
@@ -279,26 +296,29 @@ def home_page():
                     with col:
                         # Giao diện trực quan
                         # Dùng key khác nhau cho mỗi input
+                        # Dùng giá trị mặc định hợp lý cho người dùng trải nghiệm
+                        default_value = 140.0 if i == 0 else (0.5 if i == 8 else 0.0)
                         input_data[feature] = st.number_input(
                             f"{i+1}. {feature}", 
                             min_value=0.0, 
-                            value=140.0 if i == 0 else (0.5 if i == 8 else 0.0), 
+                            value=st.session_state.get(f"input_ctg_{i}", default_value), 
                             step=0.1,
                             key=f"input_ctg_{i}"
                         )
-
+            
             # Nút Lưu BẮT BUỘC cho phần nhập liệu
             if st.button("Lưu và Chẩn Đoán", key="diagnose_save", type="primary", use_container_width=True):
                 # Giả định chẩn đoán thành công (Dùng Random để mô phỏng)
                 import random
-                result_options = ["Bình thường", "Nghi ngờ", "Nguy hiểm"]
+                # Thay đổi phân phối giả định để người dùng thấy 3 kết quả khác nhau
+                result_options = ["Bình thường"] * 5 + ["Nghi ngờ"] * 3 + ["Nguy hiểm"] * 1
                 diagnosis_result = random.choice(result_options)
                 
                 # Lưu vào session state để hiển thị
                 st.session_state.diagnosis = diagnosis_result
                 st.session_state.diagnosis_time = pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S")
 
-            if 'diagnosis' in st.session_state:
+            if st.session_state.diagnosis:
                 display_diagnosis_result(st.session_state.diagnosis, st.session_state.diagnosis_time)
 
 
@@ -366,7 +386,8 @@ def personal_log_page():
         st.markdown("##### Nhật Kí Thuốc")
         
         # Đồng bộ từ hồ sơ mẹ (nếu có)
-        initial_meds = st.session_state.get('mother_meds', "Vitamin tổng hợp\nSắt/Folic Acid")
+        # Sử dụng key mới "mother_meds_home" từ trang chủ
+        initial_meds = st.session_state.get('mother_meds_home', "Vitamin tổng hợp\nSắt/Folic Acid")
         if 'meds' not in st.session_state:
             st.session_state.meds = initial_meds
             
@@ -382,6 +403,8 @@ def personal_log_page():
                 if new_medicine:
                     st.session_state.meds += f"\n{new_medicine}"
                     st.success(f"Đã thêm: {new_medicine}")
+                    # Cập nhật lại giá trị hiển thị trên màn hình
+                    st.session_state.current_meds_area = st.session_state.meds
                     st.rerun() # Refresh để cập nhật text area
         
         st.button("Lưu Nhật kí thuốc", key="save_medicine_log", type="primary", use_container_width=True) # Nút Lưu BẮT BUỘC
