@@ -127,7 +127,7 @@ def init_session_state():
     if 'user_id' not in st.session_state:
         st.session_state.user_id = ""
         
-    # Dữ liệu hồ sơ
+    # Dữ liệu hồ sơ (Khởi tạo mặc định)
     if 'profile_data' not in st.session_state:
         st.session_state.profile_data = {
             'ho_ten': 'Người dùng',
@@ -167,6 +167,7 @@ def login_page():
     # Sử dụng form để tạo nhóm input và button
     with st.form("login_form", clear_on_submit=False):
         # Email/SĐT
+        # Giao diện không có icon theo yêu cầu
         email = st.text_input("Email hoặc số điện thoại", key="email_input", placeholder="Nhập email hoặc số điện thoại")
         
         # Mật khẩu (Không có chi tiết mắt cạnh mật khẩu trong Streamlit cơ bản, dùng type="password")
@@ -291,8 +292,9 @@ def home_page():
 
                 # Tính toán lại tuần thai
                 if ngay_du_sinh_moi:
+                    # Giả định thai kỳ 40 tuần (280 ngày)
+                    total_days = 40 * 7 
                     days_remaining = (ngay_du_sinh_moi - today).days
-                    total_days = 40 * 7 # Giả định thai kỳ 40 tuần
                     days_passed = total_days - days_remaining
                     tuan_thai_hien_tai = max(0, min(40, days_passed // 7))
                     
@@ -300,18 +302,20 @@ def home_page():
                     st.markdown(f"**Tuần thai hiện tại (Tự tính):** <span style='color: {COLOR_DARK_PINK}; font-size: 20px; font-weight: 700;'>Tuần {tuan_thai_hien_tai}</span>", unsafe_allow_html=True)
                 
             with col_d:
-                # Cân nặng ước tính theo tuần thai (Giả lập theo công thức đơn giản)
-                weight_estimate = tuan_thai_hien_tai * 100 + 500 # Tăng 100g mỗi tuần + 500g ban đầu
+                # Cân nặng ước tính theo tuần thai (Giả lập theo công thức đơn giản, chỉ mang tính minh họa)
+                # Ví dụ: tuần 20 là 300g, mỗi tuần tăng 100g.
+                weight_estimate = max(0, (tuan_thai_hien_tai - 20) * 100 + 300) 
+                
                 st.markdown(f"**Cân nặng ước tính:** <span style='color: {COLOR_DARK_BLUE}; font-size: 20px; font-weight: 700;'>{weight_estimate/1000:.2f} kg</span>", unsafe_allow_html=True)
                 
                 # Mục này chỉ hiển thị, không cho chỉnh sửa trực tiếp
                 st.markdown("**Các mốc phát triển quan trọng:** (Tự động theo Tuần)")
                 if tuan_thai_hien_tai < 12:
-                    st.info("Giai đoạn hình thành cơ quan.")
+                    st.info("Giai đoạn hình thành cơ quan (Quý 1).")
                 elif tuan_thai_hien_tai < 28:
-                    st.info("Giai đoạn phát triển chiều dài và cân nặng.")
+                    st.info("Giai đoạn phát triển chiều dài và cân nặng (Quý 2).")
                 else:
-                    st.info("Giai đoạn hoàn thiện phổi và tăng tốc cân nặng.")
+                    st.info("Giai đoạn hoàn thiện phổi và tăng tốc cân nặng (Quý 3).")
 
 
             submitted_baby = st.form_submit_button("Lưu Hồ Sơ Bé", type="primary")
@@ -381,6 +385,8 @@ def home_page():
                     
                     # Lưu vào Lịch sử (Session State)
                     new_df = pd.DataFrame([new_diagnosis])
+                    # Kiểm tra và chuyển cột "Chỉ số cụ thể (Ẩn)" sang kiểu object để tránh lỗi
+                    new_df['Chỉ số cụ thể (Ẩn)'] = new_df['Chỉ số cụ thể (Ẩn)'].astype(object)
                     st.session_state.diagnosis_history = pd.concat([st.session_state.diagnosis_history, new_df], ignore_index=True)
                     
                     st.success("Đã gửi dữ liệu và nhận kết quả chẩn đoán!")
@@ -449,7 +455,7 @@ def handbook_page():
         
         current_meds = st.session_state.profile_data['thuoc_su_dung']
 
-        st.markdown("#####Danh sách thuốc đã nhập:")
+        st.markdown("##### 💊 Danh sách thuốc đã nhập:")
         
         # Chỉ hiển thị các mục không rỗng
         display_meds = [m for m in current_meds if m]
@@ -492,7 +498,7 @@ def handbook_page():
         col_e, col_f = st.columns(2)
         
         with col_e:
-            st.markdown("**Dinh Dưỡng Đề Xuất:**", unsafe_allow_html=True)
+            st.markdown("**🍲 Dinh Dưỡng Đề Xuất:**", unsafe_allow_html=True)
             st.markdown(f"""
                 - **Sắt và Axit Folic:** Rất quan trọng trong 3 tháng đầu.
                 - **Canxi:** Sữa, sữa chua, phô mai.
@@ -500,7 +506,7 @@ def handbook_page():
             """)
             
         with col_f:
-            st.markdown("**Bài Tập Sức Khỏe:**", unsafe_allow_html=True)
+            st.markdown("**🤸 Bài Tập Sức Khỏe:**", unsafe_allow_html=True)
             st.markdown(f"""
                 - **Đi bộ:** 30 phút mỗi ngày.
                 - **Bơi lội:** Giảm áp lực lên khớp.
@@ -529,13 +535,14 @@ def settings_page():
         st.markdown(f'<div class="main-content-box">', unsafe_allow_html=True)
         st.subheader("Thông tin Tài khoản")
         
-        st.markdown(f"**Tên tài khoản:** <span style='color: {COLOR_DARK_BLUE};'>{st.session_state.profile_data.get('ho_ten', 'Người dùng')}</span>", unsafe_allow_html=True)
-        st.markdown(f"**Email/Số điện thoại:** <span style='color: {COLOR_DARK_BLUE};'>{st.session_state.user_id}</span>", unsafe_allow_html=True)
+        st.markdown(f"**👤 Tên tài khoản:** <span style='color: {COLOR_DARK_BLUE};'>{st.session_state.profile_data.get('ho_ten', 'Người dùng')}</span>", unsafe_allow_html=True)
+        st.markdown(f"**📧 Email/Số điện thoại:** <span style='color: {COLOR_DARK_BLUE};'>{st.session_state.user_id}</span>", unsafe_allow_html=True)
         
         st.markdown("---")
 
         with st.form("settings_form"):
             st.markdown("##### Thay đổi Mật khẩu")
+            # Yêu cầu không dùng chi tiết icon
             mk_cu = st.text_input("Mật khẩu cũ", type="password")
             mk_moi = st.text_input("Mật khẩu mới", type="password")
             xac_nhan_mk_moi = st.text_input("Xác nhận Mật khẩu mới", type="password")
@@ -559,7 +566,7 @@ def settings_page():
 
     with tab2:
         st.markdown(f'<div class="main-content-box">', unsafe_allow_html=True)
-        st.subheader("Dấu hiệu Cảnh báo nguy hiểm")
+        st.subheader("⚠️ Dấu hiệu Cảnh báo nguy hiểm")
         st.warning("Đây là các dấu hiệu cần được quan tâm đặc biệt.")
         
         st.markdown(f"""
@@ -594,14 +601,14 @@ def main():
         return
 
     # 3. Thanh điều hướng (Sidebar)
-    st.sidebar.title("Menu Ứng Dụng")
+    st.sidebar.title("🤰 Menu Ứng Dụng")
     st.sidebar.markdown(f"**Tài khoản:** *{st.session_state.profile_data['ho_ten']}*")
     st.sidebar.markdown("---")
     
     nav_options = {
-        "home": "Trang Chủ",
-        "handbook": "Sổ Tay Cá Nhân",
-        "settings": "Cài Đặt"
+        "home": "🏠 Trang Chủ",
+        "handbook": "📖 Sổ Tay Cá Nhân",
+        "settings": "⚙️ Cài Đặt"
     }
     
     # Sử dụng radio/select box để tạo hiệu ứng chọn trang tốt hơn trong Streamlit
