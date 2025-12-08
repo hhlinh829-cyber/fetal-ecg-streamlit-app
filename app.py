@@ -197,7 +197,7 @@ def sidebar_navigation():
     st.sidebar.markdown(f"**Chào mừng, {st.session_state.username}!**")
     st.sidebar.markdown("---")
 
-    # Navigation
+    # Navigation (Chỉ dùng text, không dùng icon)
     page_options = ('Trang chủ', 'Sổ tay cá nhân', 'Cài đặt')
     current_page = st.sidebar.radio(
         "Chọn mục:",
@@ -323,7 +323,7 @@ def display_diagnosis_result(result, diagnosis_time):
     if result == "Bình thường":
         color_box = COLOR_MINT # Bạc Hà cho Bình thường
         color_text = COLOR_DARK_TEXT
-        advice = "Đây là một tín hiệu rất tích cực. Mẹ hãy tiếp tục giữ tinh thần thoải mái, đảm bảo chế độ dinh dưỡng và nghỉ ngơi hợp lý. Vui lòng theo dõi các buổi khám thai định kỳ theo lịch hẹn của bác sĩ để kiểm tra các chỉ số tổng quát khác."
+        advice = "Đây là một tín hiệu rất tích cực. Mẹ hãy tiếp tục giữ tinh thần thoải mái, đảm bảo chế độ dinh dưỡng và nghỉ ngơi hợp lý. Vui lòng theo dõi các buổi khám thai định kỳ theo lịch hẹn của bác sĩ."
     elif result == "Nghi ngờ":
         color_box = COLOR_PINK # Hồng Pastel cho Nghi ngờ
         color_text = COLOR_DEEP_ROSE
@@ -408,17 +408,25 @@ def personal_log_page():
         
         st.markdown("**1. Dinh Dưỡng Cân Bằng (Đặc biệt 3 tháng cuối):**")
         st.markdown("""
-        * **Protein:** Cần thiết cho sự phát triển não và mô của thai nhi (thịt nạc, trứng, sữa, đậu).
-        * **Sắt:** Ngăn ngừa thiếu máu cho mẹ (thịt bò, cải bó xôi). Kết hợp với Vitamin C để tăng khả năng hấp thụ.
-        * **Canxi:** Giúp hình thành xương cho bé và bảo vệ mật độ xương cho mẹ (sữa chua, phô mai, cá mòi).
-        * **Omega-3 (DHA/EPA):** Hỗ trợ phát triển thị lực và thần kinh. Nên ăn cá béo (cá hồi) hoặc dùng thực phẩm chức năng.
+        * **Protein:** Cần thiết cho sự phát triển não và mô của thai nhi (thịt nạc, trứng, sữa, đậu). Cung cấp đủ 70-100g protein mỗi ngày.
+        * **Sắt và Folic Acid:** Sắt ngăn ngừa thiếu máu. Folic Acid quan trọng cho sự phát triển ống thần kinh. Đảm bảo uống bổ sung theo chỉ định của bác sĩ.
+        * **Canxi và Vitamin D:** Canxi giúp hình thành xương cho bé và bảo vệ mật độ xương cho mẹ. Vitamin D hỗ trợ hấp thu Canxi. Nên tận dụng ánh nắng mặt trời buổi sáng.
+        * **Omega-3 (DHA/EPA):** Hỗ trợ phát triển thị lực và thần kinh. Nên ăn cá béo (cá hồi) hoặc dùng thực phẩm chức năng an toàn. Tránh xa các loại cá có hàm lượng thủy ngân cao.
         """)
         
-        st.markdown("**2. Hoạt Động Thể Chất Hợp Lý:**")
+        st.markdown("**2. Hoạt Động Thể Chất Hợp Lý và Tinh thần:**")
         st.markdown("""
-        * **Đi bộ:** Ít nhất 30 phút mỗi ngày.
-        * **Yoga:** Tập trung vào các bài tập thở và giãn cơ nhẹ nhàng giúp cải thiện tâm trạng và chuẩn bị cho quá trình sinh nở.
-        * **Nghỉ ngơi:** Ngủ đủ 7-9 tiếng mỗi đêm. Nên nằm nghiêng sang trái để cải thiện lưu thông máu.
+        * **Đi bộ và Bơi lội:** Là hai hình thức tập luyện an toàn và được khuyến nghị nhất, giúp duy trì sức bền và kiểm soát cân nặng.
+        * **Yoga và Thiền:** Tập trung vào các bài tập thở và giãn cơ nhẹ nhàng giúp cải thiện tâm trạng, giảm căng thẳng và chuẩn bị cho quá trình sinh nở.
+        * **Ngủ đủ:** Đảm bảo ngủ đủ 7-9 tiếng mỗi đêm. **Nằm nghiêng sang trái** là tư thế tối ưu để cải thiện lưu thông máu đến nhau thai.
+        * **Tránh căng thẳng:** Dành thời gian thư giãn, nghe nhạc nhẹ và trò chuyện với bé.
+        """)
+        
+        st.markdown("**3. Vệ Sinh Cá Nhân và Khám Thai:**")
+        st.markdown("""
+        * **Nước uống:** Uống đủ 2-3 lít nước mỗi ngày để ngăn ngừa táo bón và duy trì lượng ối.
+        * **Răng miệng:** Khám răng định kỳ, vì các vấn đề về răng miệng có thể liên quan đến sinh non.
+        * **Khám thai:** Tuyệt đối không bỏ lỡ các buổi khám thai định kỳ và các xét nghiệm quan trọng theo chỉ định của bác sĩ (ví dụ: Tầm soát tiểu đường thai kỳ).
         """)
 
         st.markdown("---")
@@ -428,11 +436,11 @@ def personal_log_page():
         st.markdown("Mẹ cần ghi nhớ và đến bệnh viện ngay nếu thấy bất kỳ dấu hiệu nào sau đây:")
         
         warning_list = [
-            "Chảy máu âm đạo bất thường (Màu đỏ tươi, lượng nhiều).",
-            "Đau bụng dữ dội, co thắt liên tục (đặc biệt trước 37 tuần).",
-            "Thai nhi cử động ít hơn hẳn so với bình thường (Đếm cử động, nếu < 10 lần/2 giờ).",
-            "Rò rỉ hoặc vỡ nước ối (chất lỏng chảy ra không kiểm soát).",
-            "Sốt cao (>38.5 độ C), đau đầu kéo dài hoặc thị lực kém đột ngột."
+            "Chảy máu âm đạo bất thường (Màu đỏ tươi, lượng nhiều, kèm cục máu đông).",
+            "Đau bụng dữ dội, co thắt liên tục hoặc kéo dài (đặc biệt trước 37 tuần).",
+            "Thai nhi cử động ít hơn hẳn so với bình thường (Đếm cử động, nếu < 10 lần/2 giờ hoặc có sự thay đổi lớn so với thói quen).",
+            "Rò rỉ hoặc vỡ nước ối (chất lỏng chảy ra không kiểm soát, dù chỉ là một lượng nhỏ).",
+            "Sốt cao (>38.5 độ C), đau đầu kéo dài, phù nề mặt và tay chân đột ngột (có thể là dấu hiệu tiền sản giật)."
         ]
         
         for item in warning_list:
@@ -450,7 +458,7 @@ def personal_log_page():
 
 
 def settings_page():
-    """Màn hình Cài Đặt ⚙️ (Đã loại bỏ phần Cảnh báo)"""
+    """Màn hình Cài Đặt ⚙️"""
     # Đã giữ lại icon bánh răng theo yêu cầu của bạn
     st.title("Cài Đặt ⚙️") 
     st.markdown("Quản lý thông tin cá nhân và thiết lập ứng dụng.")
