@@ -1,9 +1,7 @@
 import streamlit as st
 import pandas as pd
 import time
-# Các thư viện phân tích/mô hình: 
-# import joblib
-# from sklearn.ensemble import RandomForestClassifier
+from datetime import date, timedelta # Import date and timedelta
 
 # --- 1. CONFIGURATION AND AESTHETICS (Tông màu Mint & Rose Pastel) ---
 
@@ -126,8 +124,10 @@ if 'diagnosis' not in st.session_state:
     st.session_state.diagnosis = None
 if 'diagnosis_time' not in st.session_state:
     st.session_state.diagnosis_time = None
+# Khởi tạo ngày dự sinh mặc định (để tránh lỗi)
 if 'due_date' not in st.session_state:
-    st.session_state.due_date = pd.to_datetime('2026-03-01').date() # Dùng .date() cho st.date_input
+    # Mặc định là 40 tuần sau ngày hôm nay nếu chưa nhập
+    st.session_state.due_date = (date.today() + timedelta(days=280)).isoformat() 
 
 # Dữ liệu mẫu (mock) cho 21 chỉ số CTG/FHR
 CTG_FEATURES = [
@@ -139,8 +139,35 @@ CTG_FEATURES = [
     "Variance of Histogram", "Tendency of Histogram"
 ]
 
+# --- 3. UTILITY FUNCTIONS ---
 
-# --- 3. PAGE FUNCTIONS (Các Hàm cho từng màn hình) ---
+def calculate_gestational_week(due_date_str):
+    """Tính tuần thai dựa trên ngày dự sinh."""
+    try:
+        # Chuyển đổi chuỗi ngày dự sinh thành đối tượng date
+        due_date = date.fromisoformat(due_date_str)
+        today = date.today()
+        
+        # Tổng thời gian thai kỳ là 280 ngày (40 tuần)
+        total_days = 280
+        
+        # Tính số ngày còn lại đến ngày dự sinh
+        days_to_due = (due_date - today).days
+        
+        if days_to_due >= total_days:
+            # Nếu ngày dự sinh còn quá xa
+            return 0
+        elif days_to_due <= 0:
+            # Nếu đã quá ngày dự sinh
+            return 40 
+        else:
+            days_since_start = total_days - days_to_due
+            current_week = days_since_start // 7
+            return max(0, int(current_week))
+    except Exception:
+        return 0 # Trả về 0 nếu có lỗi xảy ra (ví dụ format ngày sai)
+
+# --- 4. PAGE FUNCTIONS (Các Hàm cho từng màn hình) ---
 
 def login_page():
     """Màn hình Đăng nhập"""
@@ -249,21 +276,17 @@ def home_page():
         with st.container(border=True):
             st.selectbox("Lần sinh thứ", options=['Lần 1', 'Lần 2', 'Lần 3+'], index=0, key="baby_order")
             
-            due_date = st.date_input("Ngày dự sinh", value=st.session_state.due_date, key="due_date_input")
-            st.session_state.due_date = due_date
+            # Khởi tạo ngày dự sinh ban đầu
+            initial_due_date = date.fromisoformat(st.session_state.due_date)
+            
+            # Lấy input ngày dự sinh
+            due_date = st.date_input("Ngày dự sinh", value=initial_due_date, key="due_date_input")
+            
+            # Cập nhật session state với format string ISO
+            st.session_state.due_date = due_date.isoformat() 
             
             # Tính Tuần thai tự động
-            today = pd.to_datetime('today').date()
-            if isinstance(due_date, pd.Timestamp):
-                 due_date = due_date.date()
-
-            days_to_due = (pd.to_datetime(due_date) - pd.to_datetime(today)).days
-            
-            current_week_display = 0
-            if days_to_due >= 0:
-                days_since_start = 280 - days_to_due
-                current_week = days_since_start / 7
-                current_week_display = max(0, int(current_week))
+            current_week_display = calculate_gestational_week(st.session_state.due_date)
             
             st.markdown(f"**Tuần thai hiện tại:** **<span style='color:{COLOR_DEEP_ROSE}; font-size: 1.1em;'>{current_week_display} tuần</span>**", unsafe_allow_html=True)
             
@@ -352,6 +375,9 @@ def personal_log_page():
     """Sổ Tay Cá Nhân (Lịch sử theo dõi, Nhật kí thuốc và Sổ tay Chăm sóc & Cảnh báo)"""
     st.title("Sổ Tay Cá Nhân")
     st.markdown("Phần này giúp mẹ theo dõi lịch sử chẩn đoán, các lời khuyên chăm sóc thai kỳ và nắm rõ các dấu hiệu cần cảnh báo.")
+    
+    # Tính tuần thai ngay ở đây để đảm bảo nó có giá trị khi truy cập trang này
+    current_week_display = calculate_gestational_week(st.session_state.due_date)
 
     # --- CẤU TRÚC TAB MỚI: Lịch sử, Thuốc, Chăm sóc & Cảnh báo ---
     tab_history, tab_medication, tab_care = st.tabs(["Lịch sử Chẩn đoán", "💊 Nhật Kí Thuốc", "✨ Sổ Tay Chăm Sóc & Cảnh Báo"])
@@ -378,6 +404,7 @@ def personal_log_page():
     with tab_medication:
         st.subheader("Nhật Kí Thuốc")
         
+        # Đảm bảo mother_meds_home luôn tồn tại trước khi dùng
         initial_meds = st.session_state.get('mother_meds_home', "Vitamin tổng hợp\nSắt/Folic Acid")
         if 'meds' not in st.session_state:
             st.session_state.meds = initial_meds
@@ -391,8 +418,10 @@ def personal_log_page():
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("+ Thêm", key="add_medicine_btn"):
                 if new_medicine:
+                    # Nối thuốc mới vào chuỗi
                     st.session_state.meds += f"\n{new_medicine}"
                     st.success(f"Đã thêm: {new_medicine}")
+                    # Cập nhật lại text area để hiện thị ngay
                     st.session_state.current_meds_area = st.session_state.meds
                     st.rerun() 
         
@@ -403,7 +432,7 @@ def personal_log_page():
         st.subheader("Hướng Dẫn Chăm Sóc & Dấu Hiệu Khẩn Cấp")
         
         # Mẹo Chăm Sóc (Nội dung dài hơn)
-        st.markdown(f"##### 🌿 Mẹo Chăm Sóc Sức Khỏe Toàn Diện ({st.session_state.current_week_display} tuần)")
+        st.markdown(f"##### 🌿 Mẹo Chăm Sóc Sức Khỏe Toàn Diện ({current_week_display} tuần)") # SỬA LỖI Ở ĐÂY
         st.info("Thai kỳ là một hành trình tuyệt vời. Hãy áp dụng những lời khuyên sau để giữ sức khỏe tốt nhất cho cả mẹ và bé.")
         
         st.markdown("**1. Dinh Dưỡng Cân Bằng (Đặc biệt 3 tháng cuối):**")
@@ -418,15 +447,15 @@ def personal_log_page():
         st.markdown("""
         * **Đi bộ và Bơi lội:** Là hai hình thức tập luyện an toàn và được khuyến nghị nhất, giúp duy trì sức bền và kiểm soát cân nặng.
         * **Yoga và Thiền:** Tập trung vào các bài tập thở và giãn cơ nhẹ nhàng giúp cải thiện tâm trạng, giảm căng thẳng và chuẩn bị cho quá trình sinh nở.
-        * **Ngủ đủ:** Đảm bảo ngủ đủ 7-9 tiếng mỗi đêm. **Nằm nghiêng sang trái** là tư thế tối ưu để cải thiện lưu thông máu đến nhau thai.
+        * **Ngủ đủ:** Đảm bảo ngủ đủ 7-9 tiếng mỗi đêm. **Nằm nghiêng sang trái** là tư thế tối ưu để cải thiện lưu thông máu đến nhau thai. Tư thế này giúp giảm áp lực lên tĩnh mạch chủ dưới, tối ưu hóa việc truyền máu và oxy cho bé.
         * **Tránh căng thẳng:** Dành thời gian thư giãn, nghe nhạc nhẹ và trò chuyện với bé.
         """)
         
         st.markdown("**3. Vệ Sinh Cá Nhân và Khám Thai:**")
         st.markdown("""
-        * **Nước uống:** Uống đủ 2-3 lít nước mỗi ngày để ngăn ngừa táo bón và duy trì lượng ối.
-        * **Răng miệng:** Khám răng định kỳ, vì các vấn đề về răng miệng có thể liên quan đến sinh non.
-        * **Khám thai:** Tuyệt đối không bỏ lỡ các buổi khám thai định kỳ và các xét nghiệm quan trọng theo chỉ định của bác sĩ (ví dụ: Tầm soát tiểu đường thai kỳ).
+        * **Nước uống:** Uống đủ 2-3 lít nước mỗi ngày để ngăn ngừa táo bón và duy trì lượng ối. Tránh đồ uống có ga và nhiều đường.
+        * **Răng miệng:** Khám răng định kỳ, vì các vấn đề về răng miệng có thể liên quan đến sinh non. Duy trì vệ sinh răng miệng cẩn thận.
+        * **Khám thai:** Tuyệt đối không bỏ lỡ các buổi khám thai định kỳ và các xét nghiệm quan trọng theo chỉ định của bác sĩ (ví dụ: Tầm soát tiểu đường thai kỳ, xét nghiệm máu).
         """)
 
         st.markdown("---")
@@ -494,7 +523,7 @@ def settings_page():
     st.markdown("Đọc **Điều khoản dịch vụ** và **Chính sách bảo mật**.")
 
 
-# --- 4. MAIN APPLICATION FLOW ---
+# --- 5. MAIN APPLICATION FLOW ---
 
 if st.session_state.logged_in == False:
     login_page()
